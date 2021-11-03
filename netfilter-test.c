@@ -143,7 +143,7 @@ int main(int argc, char **argv)
 	uint32_t queue = 0;
 	char buf[4096] __attribute__ ((aligned));
 
-	if (argc != 2) {	//modify usgage
+	if (argc != 2) {	//modify usage
 		fprintf(stderr, "syntax : netfilter-test <host>\n");
 		fprintf(stderr, "sample : netfilter-test test.gilgil.net\n");
 		exit(EXIT_FAILURE);
