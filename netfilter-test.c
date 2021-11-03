@@ -9,6 +9,10 @@
 
 #include <libnetfilter_queue/libnetfilter_queue.h>
 
+#include <string.h>	//modify header
+
+char* target_host;
+
 /* returns packet id */
 static uint32_t print_pkt (struct nfq_data *tb)
 {
@@ -80,6 +84,62 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 {
 	uint32_t id = print_pkt(nfa);
 	printf("entering callback\n");
+	
+	//modify from here
+	unsigned char *buf;
+	int size = nfq_get_payload(nfa, &buf);
+	
+	if (size >= 0)
+		printf("payload_len=%d ", size);
+	
+	if(buf[9]!=6)	//Check tcp via ip header.
+		return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+	
+	int ipHdr_size = (buf[0]&0x0F)*4;	//buf[0] indicate tcp header
+	buf = buf + ipHdr_size;
+	size = size - ipHdr_size;
+	
+	/*
+	uint16_t srcPort=ntohs(*(uint16_t*)buf), desPort=ntohs(*(uint16_t*)(buf+2));	//check http via tcp header
+	if(srcPort!=80 && desPort!=80)
+		return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+	*/
+	
+	int tcpHdr_size = ((buf[12]&0xF0)>>4)*4;	//buf[0] indicate tcp data
+	buf = buf + tcpHdr_size;
+	size = size - tcpHdr_size;
+	
+	
+	if(size<16)	//check size of tcp data
+		return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+	
+	int http_check = 0;	//check http via tcp data
+	char* request[9]={"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"};
+	for(int i=0; i<9; i++){
+		if(strncmp(buf, request[i], strlen(request[i]))==0){
+			http_check=1;
+			break;
+		}
+	}
+	if(http_check == 0)
+		return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+	
+	char* host = strstr(buf, "Host:");
+	if(host!=0 && strncmp(host+6, target_host, strlen(target_host))==0){
+		printf("DROP!!\n");
+		return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
+	}
+		
+		
+		
+	for (int i = 0; i < size; i++) {
+		printf("%c", buf[i]);
+	}
+	printf("\n");
+
+	
+	//modify to here
+	
 	return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 }
 
@@ -92,13 +152,12 @@ int main(int argc, char **argv)
 	uint32_t queue = 0;
 	char buf[4096] __attribute__ ((aligned));
 
-	if (argc == 2) {
-		queue = atoi(argv[1]);
-		if (queue > 65535) {
-			fprintf(stderr, "Usage: %s [<0-65535>]\n", argv[0]);
-			exit(EXIT_FAILURE);
-		}
+	if (argc != 2) {	//modify usgage
+		fprintf(stderr, "syntax : netfilter-test <host>\n");
+		fprintf(stderr, "sample : netfilter-test test.gilgil.net\n");
+		exit(EXIT_FAILURE);
 	}
+	target_host = argv[1];
 
 	printf("opening library handle\n");
 	h = nfq_open();
