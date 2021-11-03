@@ -11,7 +11,7 @@
 
 #include <string.h>	//modify header
 
-char* target_host;
+char* target_host;	//modify global variable
 
 /* returns packet id */
 static uint32_t print_pkt (struct nfq_data *tb)
@@ -124,20 +124,11 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 	if(http_check == 0)
 		return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 	
-	char* host = strstr(buf, "Host:");
+	char* host = strstr(buf, "Host:");	//check host
 	if(host!=0 && strncmp(host+6, target_host, strlen(target_host))==0){
 		printf("DROP!!\n");
 		return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
 	}
-		
-		
-		
-	for (int i = 0; i < size; i++) {
-		printf("%c", buf[i]);
-	}
-	printf("\n");
-
-	
 	//modify to here
 	
 	return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
